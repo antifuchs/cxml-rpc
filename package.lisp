@@ -3,4 +3,13 @@
   (:nicknames #:xml-rpc #:xrpc)
   (:export #:encoder #:call #:call-with-encoder
            #:encode-time #:decode-time
-           #:xstruct #:member-value))
+           #:xrpc-struct #:member-value #:member-names-of
+           ;; conditions:
+           #:cxml-rpc-condition #:network-error #:http-error
+           #:cxml-rpc-fault #:bad-response-structure
+           #:malformed-value-content
+           ;; condition accessors:
+           #:fault-code-of #:fault-phrase-of
+           #:status-code-of #:reason-of #:headers-of
+           #:faulty-element #:expected-element
+           #:type-of-malformed-content #:malformed-content))

@@ -33,7 +33,7 @@
                         one of ~{~A~^, ~}" (faulty-element c)
                         (mapcar #'car *xml-rpc-type-alist*)))))
 
-(define-condition malformed-value-content (bad-response-structure)
+(define-condition malformed-value-content (cxml-rpc-condition)
   ((type :initarg :type :accessor type-of-malformed-content)
    (content :initarg :content :accessor malformed-content))
   (:report (lambda (c s)
