@@ -17,6 +17,12 @@ break clients and servers.")
 (defclass xrpc-struct ()
      ((value-map :initform (make-hash-table :test #'equal))))
 
+(defun xrpc-struct (&rest key-value-pairs)
+  (let ((struct (make-instance 'xrpc-struct)))
+    (loop for (key value . rest) on key-value-pairs by #'cddr
+          do (setf (member-value key struct) value))
+    struct))
+
 (defun member-names-of (struct)
   (loop for key being the hash-key in (slot-value struct 'value-map)
         collect key))

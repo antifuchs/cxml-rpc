@@ -1,23 +1,5 @@
 (in-package :cxml-rpc)
 
-(defun decode-response (stream)
-  (let* ((source (make-source stream))
-         response-type)
-    (klacks:find-element source "methodResponse")
-    (klacks:consume source)
-    (setf response-type (nth-value 2 (klacks:find-element source)))
-    (when (equal response-type "fault")
-      (expecting-element/consuming (source "fault")
-        (let ((fault (decode-value source)))
-          (error 'cxml-rpc-fault
-                 :fault-code (member-value "faultCode" fault)
-                 :fault-phrase (member-value "faultString" fault)))))
-    (expecting-element/consuming (source "params")
-      (apply #'values
-             (loop while (eql :start-element (klacks:peek source))
-                   collect (decode-parameter source)
-                   do (skip-characters source))))))
-
 (defun skip-characters (source)
   (when (eql :characters (klacks:peek source))
     (klacks:skip source :characters)))
@@ -42,6 +24,24 @@
            (klacks:skip ,source :characters)
          (declare (ignore ,type))
          ,@body))))
+
+(defun decode-response (stream)
+  (let* ((source (make-source stream))
+         response-type)
+    (klacks:find-element source "methodResponse")
+    (klacks:consume source)
+    (setf response-type (nth-value 2 (klacks:find-element source)))
+    (when (equal response-type "fault")
+      (expecting-element/consuming (source "fault")
+        (let ((fault (decode-value source)))
+          (error 'cxml-rpc-fault
+                 :fault-code (member-value "faultCode" fault)
+                 :fault-phrase (member-value "faultString" fault)))))
+    (expecting-element/consuming (source "params")
+      (apply #'values
+             (loop while (eql :start-element (klacks:peek source))
+                   collect (decode-parameter source)
+                   do (skip-characters source))))))
 
 (defun decode-parameter (source)
   (expecting-element/consuming (source "param")
