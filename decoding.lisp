@@ -58,8 +58,10 @@
     (multiple-value-bind (type val1 val2) (klacks:peek source)
       (declare (ignore val1))
       (ecase type
-        (:characters ; stupid: if no type is specified, it's a string.
+        (:characters ; Stupid: if no type is specified, it's a string...
          (prog1 (or (decode-object :lazy-string source)
+                    ;; ...but some impls insist on indenting the
+                    ;; contents of <values>:
                     (prog1 (decode-object
                             (type-tag-for (nth-value 2 (klacks:peek source)))
                             source)

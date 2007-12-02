@@ -3,4 +3,4 @@
   (:nicknames #:xml-rpc #:xrpc)
   (:export #:encoder #:call #:call-with-encoder
            #:encode-time #:decode-time
-           #:xstruct #:xstruct-slot-value))
+           #:xstruct #:member-value))
