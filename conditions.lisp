@@ -27,11 +27,11 @@
                         expected ~S" (faulty-element c) (expected-element c)))))
 
 (define-condition bad-type-specifier (bad-response-structure)
-  ()
+  ((type-alist :initarg :type-alist :accessor type-alist))
   (:report (lambda (c s)
              (format s "Bad XML-RPC type specifier. Got ~S, expected ~
                         one of ~{~A~^, ~}" (faulty-element c)
-                        (mapcar #'car *xml-rpc-type-alist*)))))
+                        (mapcar #'car (type-alist c))))))
 
 (define-condition malformed-value-content (cxml-rpc-condition)
   ((type :initarg :type :accessor type-of-malformed-content)

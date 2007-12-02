@@ -31,7 +31,7 @@
         (case status-code
           (200
            (decode-response stream))
-          (otherwise
+          (t
            (error 'http-error :status-code status-code :reason reason-phrase
                   :headers headers)))
       (close stream))))

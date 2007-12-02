@@ -10,11 +10,10 @@
   (skip-characters source))
 
 (defmacro expecting-element/consuming ((source lname) &body body)
-  `(prog1
-     (klacks:expecting-element (,source ,lname)
-       (skip* ,source :start-element nil ,lname)
-       (prog1 (progn ,@body)
-              (skip-characters source)))))
+  `(klacks:expecting-element (,source ,lname)
+     (skip* ,source :start-element nil ,lname)
+     (multiple-value-prog1 (progn ,@body)
+                           (skip-characters ,source))))
 
 (defmacro expecting-element/characters ((source lname character-var) &body body)
   (let ((type (gensym "CHARACTER-TYPE")))
@@ -25,32 +24,50 @@
          (declare (ignore ,type))
          ,@body))))
 
+(defun decode-method-call (stream)
+  (klacks:with-open-source (source (cxml:make-source stream))
+    (klacks:find-element source "methodCall")
+    (skip* source :start-element nil "methodCall")
+    (let ((method-name (decode-method-name source)))
+      (if (eql :end-element (klacks:peek source))
+          method-name
+          (expecting-element/consuming (source "params")
+            (values method-name
+                    (loop while (eql :start-element (klacks:peek source))
+                          collect (decode-parameter source)
+                          do (skip-characters source))))))))
+
 (defun decode-response (stream)
-  (let* ((source (make-source stream))
-         response-type)
-    (klacks:find-element source "methodResponse")
-    (klacks:consume source)
-    (setf response-type (nth-value 2 (klacks:find-element source)))
-    (when (equal response-type "fault")
-      (expecting-element/consuming (source "fault")
-        (let ((fault (decode-value source)))
-          (error 'cxml-rpc-fault
-                 :fault-code (member-value "faultCode" fault)
-                 :fault-phrase (member-value "faultString" fault)))))
-    (expecting-element/consuming (source "params")
-      (apply #'values
-             (loop while (eql :start-element (klacks:peek source))
-                   collect (decode-parameter source)
-                   do (skip-characters source))))))
+  (klacks:with-open-source (source (cxml:make-source stream))
+    (let (response-type)
+      (klacks:find-element source "methodResponse")
+      (klacks:consume source)
+      (setf response-type (nth-value 2 (klacks:find-element source)))
+      (when (equal response-type "fault")
+        (expecting-element/consuming (source "fault")
+          (let ((fault (decode-value source)))
+            (error 'cxml-rpc-fault
+                   :fault-code (member-value "faultCode" fault)
+                   :fault-phrase (member-value "faultString" fault)))))
+      (expecting-element/consuming (source "params")
+        (apply #'values
+               (loop while (eql :start-element (klacks:peek source))
+                     collect (decode-parameter source)
+                     do (skip-characters source)))))))
 
 (defun decode-parameter (source)
   (expecting-element/consuming (source "param")
     (decode-value source)))
 
+(defun decode-method-name (source)
+  (multiple-value-prog1 (expecting-element/characters (source "methodName" name)
+                          name)
+                        (skip-characters source)))
+
 (defun decode-name (source)
-  (prog1 (expecting-element/characters (source "name" name)
-           name)
-         (skip-characters source)))
+  (multiple-value-prog1 (expecting-element/characters (source "name" name)
+                          name)
+                        (skip-characters source)))
 
 (defun decode-value (source)
   (klacks:expecting-element (source "value")
@@ -59,16 +76,17 @@
       (declare (ignore val1))
       (ecase type
         (:characters ; Stupid: if no type is specified, it's a string...
-         (prog1 (or (decode-object :lazy-string source)
-                    ;; ...but some impls insist on indenting the
-                    ;; contents of <values>:
-                    (prog1 (decode-object
-                            (type-tag-for (nth-value 2 (klacks:peek source)))
-                            source)
-                           (skip-characters source)))))
+         (multiple-value-prog1
+           (or (decode-object :lazy-string source)
+               ;; ...but some impls insist on indenting the
+               ;; contents of <values>:
+               (multiple-value-prog1 (decode-object
+                                      (type-tag-for (nth-value 2 (klacks:peek source)))
+                                      source)
+                                     (skip-characters source)))))
         (:start-element
-         (prog1 (decode-object (type-tag-for val2) source)
-                (skip-characters source)))))))
+         (multiple-value-prog1 (decode-object (type-tag-for val2) source)
+                               (skip-characters source)))))))
 
 (defvar *xml-rpc-type-alist* '(("dateTime.iso8601" . :date-time)
                                ("string" . :string)
@@ -162,4 +180,6 @@
                                                                 (length chars)))
                                   after-point)))))
   (:method (type source)
-    (error 'bad-type-specifier :element (nth-value 2 (klacks:peek source)))))
+    (error 'bad-type-specifier
+           :element (nth-value 2 (klacks:peek source))
+           :type-alist *xml-rpc-type-alist*)))
