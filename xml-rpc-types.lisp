@@ -1,5 +1,8 @@
 (in-package :cxml-rpc)
 
+
+;;; xml-rpc's "ISO-8601" implementation
+
 (defparameter *print-timestamps-in-utc-p* nil
   "Specifies whether so-called iso8601 timestamps are printed in the local time
 zone (as mandated by the xml-rpc specification) or as UTC, which will probably 
@@ -9,16 +12,21 @@ break clients and servers.")
      ((universal-time :initarg :universal-time :accessor universal-time-of)
       (iso8601 :initarg :iso8601 :accessor iso8601-of)))
 
-(defun universal-time-to-xml-rpc-time-string (utime utc-p)
-  (multiple-value-bind (second minute hour date month year day)
-      (apply #'decode-universal-time utime (when utc-p (list 0)))
-    (declare (ignore day))
-    (format nil "~d~2,'0d~2,'0d~A~2,'0d:~2,'0d:~2,'0d"
-            year month date
-            (if utc-p #\Z #\T)
-            hour minute second)))
+;;; Structs
 
-(defun encode-time (utime &key (utc-p *print-timestamps-in-utc-p*))
-  (make-instance 'xml-rpc-date
-     :universal-time utime
-     :iso8601 (universal-time-to-xml-rpc-time-string utime utc-p)))
+(defclass xrpc-struct ()
+     ((value-map :initform (make-hash-table :test #'equal))))
+
+(defun member-names-of (struct)
+  (loop for key being the hash-key in (slot-value struct 'value-map)
+        collect key))
+
+(defun member-value (name struct &optional default)
+  (values (gethash name (slot-value struct 'value-map) default)))
+
+(defun (setf member-value) (new-value name struct)
+  (setf (gethash name (slot-value struct 'value-map)) new-value))
+
+(defmethod print-object ((o xrpc-struct) s)
+  (print-unreadable-object (o s :type t :identity nil)
+    (format s "~{~S~^,~}" (member-names-of o))))

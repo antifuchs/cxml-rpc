@@ -9,4 +9,6 @@
   ((:file "package")
    (:file "conditions" :depends-on ("package"))
    (:file "xml-rpc-types" :depends-on ("conditions"))
-   (:file "client" :depends-on ("xml-rpc-types"))))
+   (:file "encode" :depends-on ("xml-rpc-types"))
+   (:file "decode" :depends-on ("xml-rpc-types"))
+   (:file "client" :depends-on ("encode" "decode"))))
