@@ -16,27 +16,3 @@ break clients and servers.")
   (print-unreadable-object (o s :type t :identity nil)
     (write-string (iso8601-of o) s)))
 
-;;; Structs
-
-(defclass xrpc-struct ()
-     ((value-map :initform (make-hash-table :test #'equal))))
-
-(defun xrpc-struct (&rest key-value-pairs)
-  (let ((struct (make-instance 'xrpc-struct)))
-    (loop for (key value . rest) on key-value-pairs by #'cddr
-          do (setf (member-value key struct) value))
-    struct))
-
-(defun member-names-of (struct)
-  (loop for key being the hash-key in (slot-value struct 'value-map)
-        collect key))
-
-(defun member-value (name struct &optional default)
-  (values (gethash name (slot-value struct 'value-map) default)))
-
-(defun (setf member-value) (new-value name struct)
-  (setf (gethash name (slot-value struct 'value-map)) new-value))
-
-(defmethod print-object ((o xrpc-struct) s)
-  (print-unreadable-object (o s :type t :identity nil)
-    (format s "~{~S~^,~}" (member-names-of o))))

@@ -8,82 +8,111 @@
 
 ;;; encoding
 
-(defun encode-param (object)
+(defmacro do-tagged-sequence ((type value list) &body body)
+  (let ((seq (gensym))
+        (index (gensym)))
+    `(let ((,seq ,list))
+       (etypecase ,seq
+         (list (loop for (,type ,value . nil) on ,list by #'cddr
+                     do (progn ,@body)))
+         (sequence
+          (assert (zerop (rem (length ,seq) 2)))
+          (loop for ,index from 0 below (length ,seq) by 2
+                for ,type = (elt ,seq ,index)
+                for ,value = (elt ,seq (1+ ,index))
+                do (progn ,@body)))))))
+
+(defun encode-param (type object)
   (with-element "param"
-    (encode-value object)))
+    (encode-value type object)))
 
-(defun encode-value (object)
+(defun encode-value (type object)
   (with-element "value"
-    (encode-object object)))
+    (encode-object type object)))
 
-(defun escape-string (string)
-  (declare (optimize (debug 3) (speed 0) (space 0)))
-  (with-output-to-string (s)
-    (loop for previous-posn = 0 then (1+ next-escapable-posn)
-          for next-escapable-posn = (position-if (lambda (c)
-                                                   (member c '(#\< #\> #\&)))
-                                             string
-                                             :start previous-posn)
-          do (write-string string s :start previous-posn
-                   :end (or next-escapable-posn (length string)))
-          while next-escapable-posn
-          do (ecase (char string next-escapable-posn)
-               (#\< (write-string "&lt;" s))
-               (#\> (write-string "&gt;" s))
-               (#\& (write-string "&amp;" s))))))
-
-(defun universal-time-to-xml-rpc-time-string (utime utc-p)
+(defun universal-time-to-xml-rpc-time-string (utime)
   (multiple-value-bind (second minute hour date month year day)
-      (apply #'decode-universal-time utime (when utc-p (list 0)))
+      (apply #'decode-universal-time utime
+             (when *print-timestamps-in-utc-p* (list 0)))
     (declare (ignore day))
     (format nil "~d~2,'0d~2,'0d~A~2,'0d:~2,'0d:~2,'0d"
             year month date
-            (if utc-p #\Z #\T)
+            (if *print-timestamps-in-utc-p* #\Z #\T)
             hour minute second)))
 
-(defun encode-time (utime &key (utc-p *print-timestamps-in-utc-p*))
+(defun encode-time (utime)
   (make-instance 'xml-rpc-date
      :universal-time utime
-     :iso8601 (universal-time-to-xml-rpc-time-string utime utc-p)))
+     :iso8601 (universal-time-to-xml-rpc-time-string utime)))
 
-(defgeneric encode-object (object)
-  (:method ((o symbol))
+(defun dwim-type-for (object)
+  (etypecase object
+    (boolean :boolean)
+    ((signed-byte 32) :integer)
+    (float :double)
+    (symbol :string)
+    (string :string)
+    (integer :time) ; this feels wrong, but value is a utime with a
+                    ; very high probability (:
+    (xml-rpc-date :time)
+    (file-stream :base64)
+    ((vector (unsigned-byte 8)) :base64)
+    (cons :dwim-struct)
+    (sequence :dwim-array)))
+
+(defgeneric encode-object (type object)
+  (:method ((type (eql :boolean)) o)
     (with-element "boolean"
       (text
-       (etypecase o
-         (boolean (if o "1" "0"))))))
-  (:method ((o integer))
+       (if o "1" "0"))))
+  (:method ((type (eql :integer)) (o integer))
     (with-element (etypecase o
                     ((signed-byte 32) "i4"))
       (text (format nil "~D" o))))
-  (:method ((o float))
+  (:method ((type (eql :double)) (o number))
     (with-element "double"
       (text (format nil "~F" o))))
-  (:method ((o string))
+  (:method ((type (eql :string)) o)
     (with-element "string"
-      (text (escape-string o))))
-  (:method ((o sequence))
+      (text (string o))))
+  (:method ((type (eql :array)) (o sequence))
     (with-element "array"
       (with-element "data"
-        (map 'nil #'encode-value o))))
-  (:method ((o file-stream))
-    ;; TODO: um, handle things other than FILE-STREAMs
+        (do-tagged-sequence (type value o)
+          (encode-value type value)))))
+  (:method ((type (eql :dwim-array)) (o sequence))
+    (with-element "array"
+      (with-element "data"
+        (map nil (lambda (value)
+                   (encode-value (dwim-type-for value) value))
+             o))))
+  (:method ((type (eql :base64)) (o file-stream))
+    (let* ((length (file-length o))
+           (vector (make-array length
+                               :element-type (stream-element-type o))))
+      (read-sequence vector o)
+      (encode-object :base64 vector)))
+  (:method ((type (eql :base64)) (o string))
     (with-element "base64"
-      (text
-       (let* ((length (file-length o))
-              (vector (make-array length
-                                       :element-type (stream-element-type o))))
-         (read-sequence vector o)
-         (funcall (if (character-stream-p o)
-                      #'cl-base64:string-to-base64-string
-                      #'cl-base64:usb8-array-to-base64-string) vector)))))
-  (:method ((o xml-rpc-date))
+      (text (cl-base64:string-to-base64-string o))))
+  (:method ((type (eql :base64)) (o sequence))
+    (with-element "base64"
+      (text (cl-base64:usb8-array-to-base64-string o))))
+  (:method ((type (eql :time)) (o integer))
+    (with-element "dateTime.iso8601"
+      (text (universal-time-to-xml-rpc-time-string o))))
+  (:method ((type (eql :time)) (o xml-rpc-date))
     (with-element "dateTime.iso8601"
       (text (iso8601-of o))))
-  (:method ((o xrpc-struct))
+  (:method ((type (eql :struct)) (alist cons))
     (with-element "struct"
-      (dolist (member (member-names-of o))
-        (with-element "member"
-          (with-element "name"
-            (text member))
-          (encode-value (member-value member o)))))))
+      (loop for (name value-type value) in alist
+            do (with-element "member"
+                 (with-element "name" (text name))
+                 (encode-value value-type value)))))
+  (:method ((type (eql :dwim-struct)) (alist cons))
+    (with-element "struct"
+      (loop for (name value) in alist
+            do (with-element "member"
+                 (with-element "name" (text name))
+                 (encode-value (dwim-type-for value) value))))))

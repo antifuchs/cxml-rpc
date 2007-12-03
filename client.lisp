@@ -50,5 +50,6 @@
                    (text function-name))
                  (unless (null args)
                    (with-element "params"
-                     (mapc #'encode-param args)))))))
+                     (do-tagged-sequence (type value args)
+                       (encode-param type value))))))))
     #'cxml-encoder))

@@ -50,7 +50,9 @@
                    :fault-code (member-value "faultCode" fault)
                    :fault-phrase (member-value "faultString" fault)))))
       (expecting-element/consuming (source "params")
-        (apply #'values
+        ;; spec states that only one value is returned, ever, but I believe in
+        ;; being liberal in what we accept.
+        (apply #'values  
                (loop while (eql :start-element (klacks:peek source))
                      collect (decode-parameter source)
                      do (skip-characters source)))))))
