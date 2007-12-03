@@ -50,3 +50,21 @@
   (:report (lambda (c s)
              (format s "Method ~S not found using tag ~S"
                      (name-of c) (tag-of c)))))
+
+(define-condition method-arg-type-mismatch (error)
+  ((position :initarg :position :accessor position-of)
+   (expected :initarg :expected :accessor expected-arg)
+   (got :initarg :got :accessor got-arg))
+  (:report (lambda (c s)
+             (format s "Parameter type mismatch at arg ~A: Expected ~A, got ~A"
+                     (position-of c) (expected-arg c) (got-arg c)))))
+
+(define-condition method-arg-count-mismatch (error)
+  ((expected-min :initarg :expected-min :accessor minimum)
+   (expected-max :initarg :expected-max :accessor maximum)
+   (got :initarg :got :accessor got-args))
+  (:report (lambda (c s)
+             (format s "Argument count mismatch: Expected ~:[~A~*~;~A to ~A~], ~
+                        got ~A"
+                     (/= (minimum c) (maximum c)) (minimum c) (maximum c)
+                     (got-args c)))))

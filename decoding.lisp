@@ -32,10 +32,15 @@
       (if (eql :end-element (klacks:peek source))
           method-name
           (expecting-element/consuming (source "params")
-            (values method-name
-                    (loop while (eql :start-element (klacks:peek source))
-                          collect (decode-parameter source)
-                          do (skip-characters source))))))))
+            (apply #'values
+                   method-name
+                   (loop while (eql :start-element (klacks:peek source))
+                         for (value type) = (multiple-value-list
+                                             (decode-parameter source))
+                         collect value into params
+                         collect type into param-types
+                         do (skip-characters source)
+                         finally (return (list param-types params)))))))))
 
 (defun decode-response (stream)
   (klacks:with-open-source (source (cxml:make-source stream))
@@ -47,8 +52,9 @@
         (expecting-element/consuming (source "fault")
           (let ((fault (decode-value source)))
             (error 'cxml-rpc-fault
-                   :fault-code (assoc "faultCode" fault :test #'equal)
-                   :fault-phrase (assoc "faultString" fault :test #'equal)))))
+                   :fault-code (third (assoc "faultCode" fault :test #'equal))
+                   :fault-phrase (third (assoc "faultString" fault
+                                               :test #'equal))))))
       (expecting-element/consuming (source "params")
         (decode-parameter source)))))
 
@@ -100,6 +106,9 @@
 
 (defun type-tag-for (tag)
   (cdr (assoc tag *xml-rpc-type-alist* :test #'equal)))
+
+(defun xmlrpc-type-tag (lisp-tag)
+  (car (find lisp-tag *xml-rpc-type-alist* :key 'cdr)))
 
 (defun first-invalid-integer-position (string)
   (position-if-not (lambda (c) (or (eql c #\-) (eql c #\+) (digit-char-p c)))
@@ -157,12 +166,15 @@
          :array))))
   (:method ((type (eql :struct)) source)
     (expecting-element/consuming (source "struct")
-      (loop while (eql :start-element (klacks:peek source))
-            collect (expecting-element/consuming (source "member")
-                      (let ((name (decode-name source)))
-                        (multiple-value-bind (value type)  (decode-value source)
-                          (list name type value))))
-            do (skip-characters source))))
+      (values
+       (loop while (eql :start-element (klacks:peek source))
+             collect (expecting-element/consuming (source "member")
+                       (let ((name (decode-name source)))
+                         (multiple-value-bind (value type)
+                             (decode-value source)
+                           (list name type value))))
+             do (skip-characters source))
+       :struct)))
   (:method ((type (eql :base64)) source)
     (expecting-element/characters (source "base64" chars)
       (values (cl-base64:base64-string-to-usb8-array chars) :base64)))

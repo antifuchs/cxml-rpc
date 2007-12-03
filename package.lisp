@@ -4,7 +4,9 @@
   (:export #:encoder #:call #:call-with-encoder
            #:encode-time #:decode-time
            ;; server:
-           #:cxml-rpc-method-handler
+           #:cxml-rpc-method-handler #:define-xrpc-method
+           #:invoke-method #:lookup-method #:lookup-method-signature
+           #:ensure-xrpc-method
            ;; conditions:
            #:cxml-rpc-condition #:network-error #:http-error
            #:cxml-rpc-fault #:bad-response-structure
