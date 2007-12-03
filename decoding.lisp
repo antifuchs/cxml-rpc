@@ -47,15 +47,10 @@
         (expecting-element/consuming (source "fault")
           (let ((fault (decode-value source)))
             (error 'cxml-rpc-fault
-                   :fault-code (member-value "faultCode" fault)
-                   :fault-phrase (member-value "faultString" fault)))))
+                   :fault-code (assoc "faultCode" fault :test #'equal)
+                   :fault-phrase (assoc "faultString" fault :test #'equal)))))
       (expecting-element/consuming (source "params")
-        ;; spec states that only one value is returned, ever, but I believe in
-        ;; being liberal in what we accept.
-        (apply #'values  
-               (loop while (eql :start-element (klacks:peek source))
-                     collect (decode-parameter source)
-                     do (skip-characters source)))))))
+        (decode-parameter source)))))
 
 (defun decode-parameter (source)
   (expecting-element/consuming (source "param")
@@ -79,18 +74,21 @@
       (ecase type
         (:characters ; Stupid: if no type is specified, it's a string...
          (multiple-value-prog1
-           (or (decode-object :lazy-string source)
-               ;; ...but some impls insist on indenting the
-               ;; contents of <values>:
-               (multiple-value-prog1 (decode-object
-                                      (type-tag-for (nth-value 2 (klacks:peek source)))
-                                      source)
-                                     (skip-characters source)))))
+           (multiple-value-bind (value type) (decode-object :lazy-string source)
+             ;; ...but some impls insist on indenting the contents of
+             ;; <values>:
+             (if value
+                 (values value type)
+                 (multiple-value-prog1
+                   (decode-object
+                    (type-tag-for (nth-value 2 (klacks:peek source)))
+                    source)
+                   (skip-characters source))))))
         (:start-element
          (multiple-value-prog1 (decode-object (type-tag-for val2) source)
                                (skip-characters source)))))))
 
-(defvar *xml-rpc-type-alist* '(("dateTime.iso8601" . :date-time)
+(defvar *xml-rpc-type-alist* '(("dateTime.iso8601" . :time)
                                ("string" . :string)
                                ("i4" . :integer)
                                ("int" . :integer)
@@ -108,32 +106,30 @@
                    string))
 
 (defun decode-time (string)
-  (make-instance 'xml-rpc-date
-     :iso8601 string
-     :universal-time (let ((year (subseq string 0 4))
-                           (month (subseq string 4 6))
-                           (date (subseq string 6 8))
-                           (utc-marker (subseq string 8 9))
-                           (hour (subseq string 9 11))
-                           (minute (subseq string 12 14))
-                           (second (subseq string 15 17)))
-                       (apply #'encode-universal-time
-                              (mapcar #'parse-integer
-                                      `(,second ,minute ,hour ,date ,month ,year
-                                                ,@(when (equal utc-marker "Z")
-                                                    (list "0"))))))))
+  (let ((year (subseq string 0 4))
+        (month (subseq string 4 6))
+        (date (subseq string 6 8))
+        (utc-marker (subseq string 8 9))
+        (hour (subseq string 9 11))
+        (minute (subseq string 12 14))
+        (second (subseq string 15 17)))
+    (apply #'encode-universal-time
+           (mapcar #'parse-integer
+                   `(,second ,minute ,hour ,date ,month ,year
+                             ,@(when (equal utc-marker "Z")
+                                 (list "0")))))))
 
 (defgeneric decode-object (type source)
   (:method ((type (eql :lazy-string)) source)
     (let ((string (nth-value 1 (klacks:skip source :characters))))
       (when (eql :end-element (klacks:peek source))
-        string)))
+        (values string :string))))
   (:method ((type (eql :string)) source)
     (expecting-element/characters (source "string" chars)
-      chars))
-  (:method ((type (eql :date-time)) source)
+      (values chars :string)))
+  (:method ((type (eql :time)) source)
     (expecting-element/characters (source "dateTime.iso8601" chars)
-      (decode-time chars)))
+      (values (decode-time chars) :time)))
   (:method ((type (eql :integer)) source)
     (let ((integer-spec (nth-value 2 (klacks:peek source))))
       (expecting-element/characters (source integer-spec chars)
@@ -141,28 +137,35 @@
           (when (first-invalid-integer-position chars)
             (error 'malformed-value-content
                    :type integer-spec :content chars))
-          value))))
+          (values value :integer)))))
   (:method ((type (eql :boolean)) source)
     (expecting-element/characters (source "boolean" chars)
-      (cond ((string= chars "1") t)
-            ((string= chars "0") nil)
-            (t (error 'malformed-value-content
-                      :type "boolean" :content chars)))))
+      (values (cond ((string= chars "1") t)
+                    ((string= chars "0") nil)
+                    (t (error 'malformed-value-content
+                              :type "boolean" :content chars)))
+              :boolean)))
   (:method ((type (eql :array)) source)
     (expecting-element/consuming (source "array")
       (expecting-element/consuming (source "data")
-        (loop while (eql :start-element (klacks:peek source))
-              collect (decode-value source)
-              do (skip-characters source)))))
+        (values
+         (loop while (eql :start-element (klacks:peek source))
+               for (value type) =  (multiple-value-list (decode-value source))
+               collect type
+               collect value
+               do (skip-characters source))
+         :array))))
   (:method ((type (eql :struct)) source)
     (expecting-element/consuming (source "struct")
       (loop while (eql :start-element (klacks:peek source))
             collect (expecting-element/consuming (source "member")
-                      (list (decode-name source) (decode-value source)))
+                      (let ((name (decode-name source)))
+                        (multiple-value-bind (value type)  (decode-value source)
+                          (list name type value))))
             do (skip-characters source))))
   (:method ((type (eql :base64)) source)
     (expecting-element/characters (source "base64" chars)
-      (cl-base64:base64-string-to-usb8-array chars)))
+      (values (cl-base64:base64-string-to-usb8-array chars) :base64)))
   (:method ((type (eql :double)) source)
     (expecting-element/characters (source "double" chars)
       (let ((point-posn (first-invalid-integer-position chars))
@@ -174,10 +177,13 @@
                                  :start (1+ point-posn))
             (error 'malformed-value-content :type "double" :content chars))
           (setf after-point (parse-integer chars :start (1+ point-posn))))
-        (read-from-string (format nil "~D.~D"
-                                  (parse-integer chars :end (or point-posn
-                                                                (length chars)))
-                                  after-point)))))
+        (values
+         (read-from-string (format nil "~D.~D"
+                                   (parse-integer chars
+                                                  :end (or point-posn
+                                                           (length chars)))
+                                   after-point))
+         :double))))
   (:method (type source)
     (error 'bad-type-specifier
            :element (nth-value 2 (klacks:peek source))
