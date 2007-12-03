@@ -3,7 +3,6 @@
   (:nicknames #:xml-rpc #:xrpc)
   (:export #:encoder #:call #:call-with-encoder
            #:encode-time #:decode-time
-           #:xrpc-struct #:member-value #:member-names-of
            ;; server:
            #:cxml-rpc-method-handler
            ;; conditions:

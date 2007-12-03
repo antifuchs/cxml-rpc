@@ -45,7 +45,7 @@
         (report-error -32601 (princ-to-string c)))
       (program-error (c)
         (report-error -32603 (princ-to-string c)))
-      #+(or) (klacks::klacks-error (c)  ; doesn't seem to be defined?
+      (klacks::klacks-error (c)  ; doesn't seem to be defined?
                (report-error -32700
                              (format nil "Parse error from klacks: ~A" c)))
       (error (c)
