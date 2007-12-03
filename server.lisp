@@ -90,7 +90,7 @@ xml-rpc implementation supports."
                "introspect"
                (xrpc-struct "specUrl"
                             "http://xmlrpc-c.sourceforge.net/introspection.html"
-                            "specVersion" "November 2007")
+                            "specVersion" "1")
                "faults_interop"
                (xrpc-struct
                 "specUrl"
