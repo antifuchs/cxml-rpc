@@ -20,7 +20,9 @@
     `(klacks:expecting-element (,source ,lname)
        (klacks:skip ,source :start-element nil ,lname)
        (multiple-value-bind (,type ,character-var)
-           (klacks:skip ,source :characters)
+           (if (eql (klacks:peek ,source) :characters)
+               (klacks:skip ,source :characters)
+               (values nil ""))
          (declare (ignore ,type))
          ,@body))))
 
@@ -92,7 +94,8 @@
                    (skip-characters source))))))
         (:start-element
          (multiple-value-prog1 (decode-object (type-tag-for val2) source)
-                               (skip-characters source)))))))
+                               (skip-characters source)))
+        (:end-element (values "" :string))))))
 
 (defvar *xml-rpc-type-alist* '(("dateTime.iso8601" . :time)
                                ("string" . :string)
