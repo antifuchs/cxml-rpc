@@ -3,6 +3,7 @@
   (:nicknames #:xml-rpc #:xrpc)
   (:export #:encoder #:call #:call-with-encoder
            #:encode-time #:decode-time
+           #:trace-xml-response #:encoded-request
            ;; server:
            #:cxml-rpc-method-handler #:define-xrpc-method
            #:invoke-method #:lookup-method #:lookup-method-signature
