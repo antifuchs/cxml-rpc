@@ -1,30 +1,41 @@
 (in-package :cxml-rpc)
 
 (defun skip-characters (source)
-  (when (eql :characters (klacks:peek source))
-    (klacks:skip source :characters)))
+  (apply #'concatenate 'string
+         (loop while (eql :characters (klacks:peek source))
+               collect (nth-value 1 (klacks:skip source :characters)))))
 
 (defun skip* (source &rest args)
   (skip-characters source)
   (apply #'klacks:skip source args)
   (skip-characters source))
 
+(defun invoke-expecting-element/consuming (source element continuation)
+  (klacks:expecting-element (source element)
+    (skip* source :start-element nil element)
+    (multiple-value-prog1 (progn (funcall continuation source))
+                          (skip-characters source))))
+
 (defmacro expecting-element/consuming ((source lname) &body body)
-  `(klacks:expecting-element (,source ,lname)
-     (skip* ,source :start-element nil ,lname)
-     (multiple-value-prog1 (progn ,@body)
-                           (skip-characters ,source))))
+  `(flet ((expecting-element-continuation (,source)
+            ,@body))
+     (invoke-expecting-element/consuming ,source ,lname
+                                         #'expecting-element-continuation)))
+
+(defun invoke-expecting-element/characters (source element continuation)
+  (klacks:expecting-element (source element)
+    (klacks:skip source :start-element nil element)
+    (let ((characters (skip-characters source)))
+      (funcall continuation source characters))))
 
 (defmacro expecting-element/characters ((source lname character-var) &body body)
-  (let ((type (gensym "CHARACTER-TYPE")))
-    `(klacks:expecting-element (,source ,lname)
-       (klacks:skip ,source :start-element nil ,lname)
-       (multiple-value-bind (,type ,character-var)
-           (if (eql (klacks:peek ,source) :characters)
-               (klacks:skip ,source :characters)
-               (values nil ""))
-         (declare (ignore ,type))
-         ,@body))))
+  `(flet ((expecting-element/characters-continuation
+              (,source ,character-var)
+            (declare (ignorable source))
+            ,@body))
+     (invoke-expecting-element/characters
+      ,source ,lname
+      #'expecting-element/characters-continuation)))
 
 (defun decode-method-call (stream)
   (klacks:with-open-source (source (cxml:make-source stream))
