@@ -13,3 +13,7 @@
    (:file "decoding" :depends-on ("xml-rpc-types"))
    (:file "client" :depends-on ("encoding" "decoding"))
    (:file "server" :depends-on ("encoding" "decoding"))))
+
+(defsystem #:cxml-rpc-tests
+  :depends-on (#:cxml #:fiveam)
+  :components ((:file "tests")))
