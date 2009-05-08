@@ -4,7 +4,7 @@
 (cl:in-package #:cxml-rpc.package)
 
 (defsystem #:cxml-rpc
-  :depends-on (#:cxml #:cl-base64 #:drakma #:hunchentoot)
+  :depends-on (#:cxml #:cl-base64 #:drakma #:hunchentoot #:parse-number)
   :components
   ((:file "package")
    (:file "conditions" :depends-on ("package"))

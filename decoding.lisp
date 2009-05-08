@@ -194,22 +194,14 @@
       (values (cl-base64:base64-string-to-usb8-array chars) :base64)))
   (:method ((type (eql :double)) source)
     (expecting-element/characters (source "double" chars)
-      (let ((point-posn (first-invalid-integer-position chars))
-            (after-point 0))
-        (when (and point-posn (not (eql (char chars point-posn) #\.)))
-          (error 'malformed-value-content :type "double" :content chars))
-        (when point-posn
-          (when (position-if-not #'digit-char-p chars
-                                 :start (1+ point-posn))
-            (error 'malformed-value-content :type "double" :content chars))
-          (setf after-point (parse-integer chars :start (1+ point-posn))))
-        (values
-         (read-from-string (format nil "~D.~D"
-                                   (parse-integer chars
-                                                  :end (or point-posn
-                                                           (length chars)))
-                                   after-point))
-         :double))))
+      (when (find-if-not (lambda (c)
+                           (or (digit-char-p c)
+                               (member c '(#\. #\-))))
+                         chars)
+        (error 'malformed-value-content :type "double" :content chars))
+      (handler-case (parse-number:parse-real-number chars)
+        (parse-error ()
+          (error 'malformed-value-content :type "double" :content chars)))))
   (:method (type source)
     (error 'bad-type-specifier
            :element (nth-value 2 (klacks:peek source))
