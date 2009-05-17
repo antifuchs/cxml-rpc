@@ -199,7 +199,7 @@
                                (member c '(#\. #\-))))
                          chars)
         (error 'malformed-value-content :type "double" :content chars))
-      (handler-case (parse-number:parse-real-number chars)
+      (handler-case (values (parse-number:parse-real-number chars) :double)
         (parse-error ()
           (error 'malformed-value-content :type "double" :content chars)))))
   (:method (type source)

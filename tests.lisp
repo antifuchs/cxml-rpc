@@ -5,5 +5,6 @@
 
 (fiveam:test decode-response/double
   (fiveam:is
-   (eql 1.06
-        (decode-response "<methodResponse><params><param><value><double>1.06</double></value></param></params></methodResponse>"))))
+   (equal (list 1.06 :double)
+          (multiple-value-list
+           (decode-response "<methodResponse><params><param><value><double>1.06</double></value></param></params></methodResponse>")))))
