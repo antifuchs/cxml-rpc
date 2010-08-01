@@ -11,21 +11,15 @@ BEANSTALK_CONNSPEC = "localhost:#{PORT}"
 
 # Programs we need:
 
-unless File.exist?(File.expand_path("../step_definitions/clucumber_override.wire", File.dirname(__FILE__)))
-  begin
-    @main_clucumber = ClucumberSubprocess.new(File.expand_path("../", File.dirname(__FILE__)),
-                                              :port => 42428)
-    at_exit do
-      @main_clucumber.kill
-    end
-
-    @main_clucumber.start <<-LISP
-      (load #p"#{File.expand_path("../../cxml-rpc.asd", File.dirname(__FILE__))}")
-      (asdf:oos 'asdf:load-op :cxml-rpc)
-    LISP
-  rescue PTY::ChildExited
-    puts(@main_clucumber && @main_clucumber.output)
-  end
+require 'clucumber'
+begin
+  ClucumberSubprocess.launch(File.expand_path("../", File.dirname(__FILE__)),
+                             :port => 42428).listen <<-LISP
+    (load #p"#{File.expand_path("../../cxml-rpc.asd", File.dirname(__FILE__))}")
+    (asdf:oos 'asdf:load-op :cxml-rpc)
+  LISP
+rescue PTY::ChildExited
+  STDERR.puts(@main_clucumber && @main_clucumber.output)
 end
 
 After do
