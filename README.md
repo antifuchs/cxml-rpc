@@ -45,8 +45,8 @@ You can run multiple XML RPC handlers in your hunchentoot instance: These are id
 
 	(push 
          (hunchentoot:create-prefix-dispatcher "/RPC2" 
-	                                       (cxml:cxml-rpc-method-handler 'some-tag))
-	 hunchentoot:*dispatch-table*)
+                                               (cxml:cxml-rpc-method-handler 'some-tag))
+         hunchentoot:*dispatch-table*)
 
 This tells hunchentoot to dispatch xml-rpc calls on /RPC2 to dispatch xml-rpc methods. This handler will serve only methods that are defined with the group tag some-tag.
 	
