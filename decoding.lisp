@@ -144,7 +144,7 @@
 
 (defgeneric decode-object (type source)
   (:method ((type (eql :lazy-string)) source)
-    (let ((string (nth-value 1 (klacks:skip source :characters))))
+    (let ((string (skip-characters source)))
       (when (eql :end-element (klacks:peek source))
         (values string :string))))
   (:method ((type (eql :string)) source)
