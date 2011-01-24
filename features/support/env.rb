@@ -15,8 +15,7 @@ require 'clucumber'
 begin
   ClucumberSubprocess.launch(File.expand_path("../", File.dirname(__FILE__)),
                              :port => 42428).listen <<-LISP
-    (load #p"#{File.expand_path("../../cxml-rpc.asd", File.dirname(__FILE__))}")
-    (asdf:oos 'asdf:load-op :cxml-rpc)
+    (push #p"#{File.expand_path("../../", File.dirname(__FILE__))}/" asdf:*central-registry*)
   LISP
 rescue PTY::ChildExited
   STDERR.puts(@main_clucumber && @main_clucumber.output)
