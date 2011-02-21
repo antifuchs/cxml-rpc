@@ -50,6 +50,8 @@
 
 (defun encoder (function-name &rest args)
   (labels ((cxml-encoder (stream)
+             (when (typep stream 'flexi-streams:flexi-stream)
+              (setf (flexi-streams:flexi-stream-element-type stream) 'flexi-streams:octet))
              (cxml:with-xml-output
                  (funcall (if (character-stream-p stream)
                               #'cxml:make-character-stream-sink
