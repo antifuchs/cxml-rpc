@@ -62,8 +62,7 @@
                (with-element "methodCall"
                  (with-element "methodName"
                    (text function-name))
-                 (unless (null args)
-                   (with-element "params"
-                     (do-tagged-sequence (type value args)
-                       (encode-param type value))))))))
+                 (with-element "params"
+                   (do-tagged-sequence (type value args)
+                     (encode-param type value)))))))
     #'cxml-encoder))
