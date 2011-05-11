@@ -4,6 +4,7 @@
 (cl:in-package #:cxml-rpc.package)
 
 (defsystem #:cxml-rpc
+  :description "An XML-RPC interface for Common Lisp"
   :depends-on (#:cxml #:cl-base64 #:drakma #:hunchentoot #:parse-number)
   :components
   ((:file "package")
