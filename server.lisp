@@ -11,13 +11,13 @@
 (defun cxml-rpc-method-handler (tag)
   (labels
       ((dispatch ()
-         (unless (eql (hunchentoot:request-method) :post)
+         (unless (eql (hunchentoot:request-method*) :post)
            (error "Method must be POST"))
          (let ((stream (hunchentoot:raw-post-data :force-binary t))
                (*current-tag* tag))
            (multiple-value-bind (method-name param-types params)
                (decode-method-call stream)
-             (setf (hunchentoot:content-type) "text/xml") 
+             (setf (hunchentoot:content-type) "text/xml")
              (invoke-method method-name param-types params)))))
     #'dispatch))
 
@@ -195,7 +195,7 @@ xml-rpc implementation supports."
           :dwim-array))
 
 (defun system-method-signature (method-name)
-  "Returns an array of method signatures (arrays of strings listing first the 
+  "Returns an array of method signatures (arrays of strings listing first the
 return type, then the argument types)."
   ;; TODO: user-def methods.
   (values
@@ -209,4 +209,3 @@ return type, then the argument types)."
                               'function)
                "undef")
            :string))
-
