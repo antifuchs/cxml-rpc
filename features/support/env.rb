@@ -1,24 +1,23 @@
 require 'cucumber'
-require 'spec'
+#require 'spec'
 
 require 'xmlrpc/client'
 require 'xmlrpc/server'
-require 'clucumber'
-
-# Constants:
-PORT = 11317
-BEANSTALK_CONNSPEC = "localhost:#{PORT}"
 
 # Programs we need:
 
 require 'clucumber'
 begin
-  ClucumberSubprocess.launch(File.expand_path("../", File.dirname(__FILE__)),
-                             :port => 42428).listen <<-LISP
-    (push #p"#{File.expand_path("../../", File.dirname(__FILE__))}/" asdf:*central-registry*)
+  puts "Launching..."
+  (@main_clucumber = ClucumberSubprocess.launch(File.expand_path("../", File.dirname(__FILE__)))).listen <<-LISP
+      (load #p"#{File.expand_path("../../cl-stripe.asd", File.dirname(__FILE__))}")
+      (ql:quickload :cl-stripe)
   LISP
-rescue PTY::ChildExited
+  STDERR.puts(@main_clucumber.output)
+rescue PTY::ChildExited => e
+  STDERR.puts "Failure: #{@main_clucumber.inspect}: #{e.inspect}!"
   STDERR.puts(@main_clucumber && @main_clucumber.output)
+  exit 1
 end
 
 After do
